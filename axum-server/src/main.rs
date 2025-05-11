@@ -5,12 +5,14 @@ use sqlx::PgPool;
 use tracing::info;
 
 mod errors;
+mod logs;
 mod models;
 mod utils;
 
 use errors::AppError;
+use logs::setup_tracing;
 use models::items::create_router;
-use utils::{health_check, initialize_postgresql, setup_tracing, shutdown_signal};
+use utils::{health_check, initialize_postgresql, shutdown_signal};
 
 // --- 应用程序状态 ---
 // 使用 Arc 来安全地在多线程间共享 PgPool
@@ -28,7 +30,10 @@ async fn main() -> Result<(), AppError> {
         eprintln!("Failed to set up tracing: {}", e);
         // 根据需要决定是否在此处 panic 或退出
         // 对于生产应用，通常会记录这个错误到某个备用机制然后尝试继续或安全退出
-        return Err(AppError::ConfigError(format!("Tracing setup failed: {}", e)));
+        return Err(AppError::ConfigError(format!(
+            "Tracing setup failed: {}",
+            e
+        )));
     }
 
     info!("Tracing initialized...\nStarting server...");
