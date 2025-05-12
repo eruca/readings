@@ -1,4 +1,4 @@
-use std::{env, io};
+use std::{env, io, path::Path};
 
 use tracing::level_filters::LevelFilter;
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
@@ -28,7 +28,7 @@ pub(crate) fn setup_tracing() -> Result<(), Box<dyn std::error::Error>> {
 
     // --- 从环境变量配置全局日志级别 ---
     // 例如: RUST_LOG=info
-    // 或者 RUST_LOG=axum_postgres_prod=debug,tower_http=info
+    // 或者 RUST_LOG=axum_server=debug,tower_http=info
     // 如果未设置 RUST_LOG，则默认为 "info"
     let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
     let log_directory = "logs";
@@ -36,13 +36,7 @@ pub(crate) fn setup_tracing() -> Result<(), Box<dyn std::error::Error>> {
 
     // --- 构建可选的文件日志 Layers ---
     let error_file_layer_opt = if enable_file_logging {
-        let appender = RollingFileAppender::builder()
-            .rotation(Rotation::DAILY)
-            .filename_prefix("error")
-            .filename_suffix("json")
-            .max_log_files(max_rotate_files)
-            .build(log_directory)?;
-
+        let appender = appender_builder(log_directory, "error", max_rotate_files)?;
         Some(
             fmt::layer()
                 .with_writer(appender)
@@ -57,12 +51,7 @@ pub(crate) fn setup_tracing() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let warn_file_layer_opt = if enable_file_logging {
-        let appender = RollingFileAppender::builder()
-            .rotation(Rotation::DAILY)
-            .filename_prefix("warn")
-            .filename_suffix("json")
-            .max_log_files(max_rotate_files)
-            .build(log_directory)?;
+        let appender = appender_builder(log_directory, "warn", max_rotate_files)?;
         Some(
             fmt::layer()
                 .with_writer(appender)
@@ -77,13 +66,8 @@ pub(crate) fn setup_tracing() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let info_file_layer_opt = if enable_file_logging {
-        let appender = RollingFileAppender::builder()
-            .rotation(Rotation::DAILY)
-            .filename_prefix("info")
-            .filename_suffix("json")
-            .max_log_files(max_rotate_files)
-            .build(log_directory)?;
-        
+        let appender = appender_builder(log_directory, "info", max_rotate_files)?;
+
         Some(
             fmt::layer()
                 .with_writer(appender)
@@ -98,12 +82,7 @@ pub(crate) fn setup_tracing() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let debug_file_layer_opt = if enable_file_logging {
-        let appender = RollingFileAppender::builder()
-            .rotation(Rotation::DAILY)
-            .filename_prefix("debug")
-            .filename_suffix("json")
-            .max_log_files(max_rotate_files)
-            .build(log_directory)?;
+        let appender = appender_builder(log_directory, "debug", max_rotate_files)?;
 
         Some(
             fmt::layer()
@@ -142,4 +121,18 @@ pub(crate) fn setup_tracing() -> Result<(), Box<dyn std::error::Error>> {
         .try_init()?; // 初始化最终的 subscriber
 
     Ok(())
+}
+
+fn appender_builder(
+    dir: impl AsRef<Path>,
+    prefix: impl AsRef<str>,
+    max_rotate_files: usize,
+) -> Result<RollingFileAppender, Box<dyn std::error::Error>> {
+    let appender = RollingFileAppender::builder()
+        .rotation(Rotation::DAILY)
+        .filename_prefix(prefix.as_ref())
+        .filename_suffix("json")
+        .max_log_files(max_rotate_files)
+        .build(dir)?;
+    Ok(appender)
 }
